@@ -44,23 +44,28 @@ func main() {
 	}
 
 	wg := sync.WaitGroup{}
-	streams := make([]StreamPair, 0)
+
+	filteredSources := make([]pkg.Source, 0)
 	for _, v := range sources {
+		if len(opts.Containers.Names) == 0 || contains(opts.Containers.Names, v.Name()) {
+			filteredSources = append(filteredSources, v)
+		}
+	}
+
+	streams := make([]StreamPair, len(filteredSources))
+	for i, v := range filteredSources {
 		name := v.Name()
-		if len(opts.Containers.Names) == 0 || contains(opts.Containers.Names, name) {
-			out, err := v.Tail(ctx, true, opts.Tail)
+		out, err := v.Tail(ctx, true, opts.Tail)
 
-			r, g, b := nameToRgb(name)
+		r, g, b := generateRgb(i, len(streams))
 
-			sp := StreamPair{
-				prefix: fmt.Sprintf("%-*s", prefixLength, name),
-				color:  gchalk.RGB(r, g, b),
-				bold:   gchalk.WithRGB(r, g, b).Bold,
-				stdout: bufio.NewScanner(out),
-				stderr: bufio.NewScanner(err),
-				wg:     &wg,
-			}
-			streams = append(streams, sp)
+		streams[i] = StreamPair{
+			prefix: fmt.Sprintf("%-*s", prefixLength, name),
+			color:  gchalk.RGB(r, g, b),
+			bold:   gchalk.WithRGB(r, g, b).Bold,
+			stdout: bufio.NewScanner(out),
+			stderr: bufio.NewScanner(err),
+			wg:     &wg,
 		}
 	}
 
@@ -106,6 +111,13 @@ func tail(out chan string, in *bufio.Scanner, prefix string, color gchalk.ColorF
 
 func nameToRgb(name string) (r uint8, g uint8, b uint8) {
 	h := float64(hash(name))
+	s := rand.Float64()
+	l := 0.5
+	return colorutil.HslToRgb(h, s, l)
+}
+
+func generateRgb(i int, size int) (r uint8, g uint8, b uint8) {
+	h := (float64(i) / float64(size)) * 360
 	s := rand.Float64()
 	l := 0.5
 	return colorutil.HslToRgb(h, s, l)
