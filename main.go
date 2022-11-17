@@ -16,7 +16,7 @@ import (
 )
 
 type Options struct {
-	Tail       string `short:"t" long:"tail" description:"Number of lines to show from the end of the logs (default \"all\")" default:"all"`
+	Tail       string `short:"t" long:"tail" description:"Number of lines to show from the end of the logs" default:"all"`
 	Containers struct {
 		Names []string `positional-arg-name:"containers"`
 	} `positional-args:"yes"`
