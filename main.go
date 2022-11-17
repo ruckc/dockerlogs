@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"hash/fnv"
 	"math/rand"
 	"sync"
 
@@ -109,24 +108,11 @@ func tail(out chan string, in *bufio.Scanner, prefix string, color gchalk.ColorF
 	}
 }
 
-func nameToRgb(name string) (r uint8, g uint8, b uint8) {
-	h := float64(hash(name))
-	s := rand.Float64()
-	l := 0.5
-	return colorutil.HslToRgb(h, s, l)
-}
-
 func generateRgb(i int, size int) (r uint8, g uint8, b uint8) {
 	h := (float64(i) / float64(size)) * 360
 	s := rand.Float64()
 	l := 0.5
 	return colorutil.HslToRgb(h, s, l)
-}
-
-func hash(text string) uint32 {
-	h := fnv.New32()
-	h.Write([]byte(text))
-	return h.Sum32()
 }
 
 func Max(a int, b int) int {
