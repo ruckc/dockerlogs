@@ -27,7 +27,7 @@ func main() {
 	}
 
 	for i, v := range sources {
-		out, err := v.Tail(ctx, false, "10")
+		out, err := v.Tail(ctx, true, "all")
 
 		r, g, b := nameToRgb(v.Name())
 
@@ -73,8 +73,11 @@ func (sp *StreamPair) Tail(out chan string) {
 func tail(out chan string, in *bufio.Scanner, prefix string, color gchalk.ColorFn) {
 	for in.Scan() {
 		bytes := in.Bytes()
-		out <- color(prefix + " " + string(bytes[8:]))
+		if len(bytes) > 8 {
+			out <- color(prefix + " " + string(bytes[8:]))
+		}
 	}
+	fmt.Printf("EOF %s\n", prefix)
 }
 
 func nameToRgb(name string) (r uint8, g uint8, b uint8) {
