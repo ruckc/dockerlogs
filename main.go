@@ -9,39 +9,62 @@ import (
 	"sync"
 
 	"github.com/PerformLine/go-stockutil/colorutil"
+	flags "github.com/jessevdk/go-flags"
 	"github.com/jwalton/gchalk"
 
 	"github.com/ruckc/dockerlogs/pkg"
 )
 
+type Options struct {
+	Tail       string `short:"t" long:"tail" description:"Number of lines to show from the end of the logs (default \"all\")" default:"all"`
+	Containers struct {
+		Names []string `positional-arg-name:"containers"`
+	} `positional-args:"yes"`
+}
+
 func main() {
+	opts := Options{}
+	parser := flags.NewParser(&opts, flags.Default)
+	parser.ShortDescription = "tails multiple containers concurrently"
+	parser.LongDescription = "tails multiple containers concurrently"
+
+	_, err := parser.Parse()
+	if err != nil {
+		return
+	}
+
 	ctx := context.Background()
 	dp := pkg.NewLocalDockerProvider()
 	dp.Refresh(ctx)
 	sources := dp.GetSources()
 
-	streams := make([]StreamPair, len(sources))
 	prefixLength := 0
 	for _, v := range sources {
 		prefixLength = Max(prefixLength, len(v.Name()))
 	}
 
-	for i, v := range sources {
-		out, err := v.Tail(ctx, true, "all")
+	wg := sync.WaitGroup{}
+	streams := make([]StreamPair, 0)
+	for _, v := range sources {
+		name := v.Name()
+		if len(opts.Containers.Names) == 0 || contains(opts.Containers.Names, name) {
+			out, err := v.Tail(ctx, true, opts.Tail)
 
-		r, g, b := nameToRgb(v.Name())
+			r, g, b := nameToRgb(name)
 
-		streams[i] = StreamPair{
-			prefix: fmt.Sprintf("%-*s", prefixLength, v.Name()),
-			color:  gchalk.RGB(r, g, b),
-			bold:   gchalk.WithRGB(r, g, b).Bold,
-			stdout: bufio.NewScanner(out),
-			stderr: bufio.NewScanner(err),
+			sp := StreamPair{
+				prefix: fmt.Sprintf("%-*s", prefixLength, name),
+				color:  gchalk.RGB(r, g, b),
+				bold:   gchalk.WithRGB(r, g, b).Bold,
+				stdout: bufio.NewScanner(out),
+				stderr: bufio.NewScanner(err),
+				wg:     &wg,
+			}
+			streams = append(streams, sp)
 		}
 	}
 
 	out := make(chan string)
-	wg := sync.WaitGroup{}
 	wg.Add(len(streams) * 2)
 	go func() {
 		wg.Wait()
@@ -63,21 +86,22 @@ type StreamPair struct {
 	bold   gchalk.ColorFn
 	stdout *bufio.Scanner
 	stderr *bufio.Scanner
+	wg     *sync.WaitGroup
 }
 
 func (sp *StreamPair) Tail(out chan string) {
-	go tail(out, sp.stdout, sp.prefix, sp.color)
-	go tail(out, sp.stderr, sp.prefix, sp.bold)
+	go tail(out, sp.stdout, sp.prefix, sp.color, sp.wg)
+	go tail(out, sp.stderr, sp.prefix, sp.bold, sp.wg)
 }
 
-func tail(out chan string, in *bufio.Scanner, prefix string, color gchalk.ColorFn) {
+func tail(out chan string, in *bufio.Scanner, prefix string, color gchalk.ColorFn, wg *sync.WaitGroup) {
+	defer wg.Done()
 	for in.Scan() {
 		bytes := in.Bytes()
 		if len(bytes) > 8 {
 			out <- color(prefix + " " + string(bytes[8:]))
 		}
 	}
-	fmt.Printf("EOF %s\n", prefix)
 }
 
 func nameToRgb(name string) (r uint8, g uint8, b uint8) {
@@ -98,4 +122,13 @@ func Max(a int, b int) int {
 		return a
 	}
 	return b
+}
+
+func contains(s []string, e string) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
 }
