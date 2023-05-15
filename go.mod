@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/PerformLine/go-stockutil v1.9.3
-	github.com/docker/docker v23.0.5+incompatible
+	github.com/docker/docker v23.0.6+incompatible
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/jwalton/gchalk v1.3.0
 )
